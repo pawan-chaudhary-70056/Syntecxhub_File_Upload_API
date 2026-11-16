@@ -123,6 +123,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Browsers request /favicon.ico automatically. The API does not ship a
+// favicon, so return 204 instead of logging a noisy 404.
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 app.use('/api', apiLimiter);
 app.use('/api/uploads', uploadRoutes);
 

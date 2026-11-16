@@ -216,6 +216,16 @@ test('returns 400 for invalid ids and 404 for missing uploads', async () => {
   assert.equal(missing.status, 404);
 });
 
+test('returns 204 for favicon and JSON 404 for unknown routes', async () => {
+  const favicon = await request(app).get('/favicon.ico');
+  assert.equal(favicon.status, 204);
+
+  const unknown = await request(app).get('/api/not-a-real-route');
+  assert.equal(unknown.status, 404);
+  assert.equal(unknown.body.success, false);
+  assert.match(unknown.body.message, /not found/i);
+});
+
 test('serves Swagger UI and the OpenAPI document', async () => {
   const spec = await request(app).get('/api-docs.json');
   assert.equal(spec.status, 200);

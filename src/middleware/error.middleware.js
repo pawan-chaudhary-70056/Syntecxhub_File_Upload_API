@@ -48,10 +48,16 @@ function errorHandler(err, req, res, next) {
   }
 
   if (process.env.NODE_ENV !== 'test') {
-    console.error(
-      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`,
-      err
-    );
+    const statusCode = error.statusCode || 500;
+    const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${statusCode} - ${error.message}`;
+
+    if (statusCode >= 500) {
+      // Unexpected server errors keep the full stack for debugging.
+      console.error(logLine, err);
+    } else {
+      // Expected client errors (400/404/409/429, etc.) are one line only.
+      console.warn(logLine);
+    }
   }
 
   const response = {
