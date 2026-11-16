@@ -26,8 +26,6 @@ Built for the **Syntecxhub Back-End Development Internship** using:
 - Docker + Docker Compose
 - Helmet, CORS, rate limiting, safe static serving, centralised error handling
 
-> Full setup instructions: **[setup.md](setup.md)**
-
 ---
 
 ## Tech Stack
