@@ -1,0 +1,471 @@
+{
+  "info": {
+    "_postman_id": "b6f4c2a1-3d5e-4f7a-9c8b-1a2b3c4d5e6f",
+    "name": "Syntecxhub File Upload API",
+    "description": "Postman collection for the Syntecxhub Back-End Week 1 File/Image Upload API.\n\nEndpoints:\n- GET /api/health\n- POST /api/uploads\n- GET /api/uploads\n- GET /api/uploads/:id\n- GET /uploads/:filename\n- DELETE /api/uploads/:id\n\nBefore uploading, select a JPEG, PNG, WebP, or GIF file (max 2 MB) in the form-data body.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('API reports healthy', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.database).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Check that the API and MongoDB connection are alive."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Uploads",
+      "item": [
+        {
+          "name": "Upload Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test('Returns upload metadata and URL', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.id).to.be.a('string');",
+                  "  pm.expect(body.data.filename).to.be.a('string');",
+                  "  pm.expect(body.data.url).to.include('/uploads/');",
+                  "  pm.expect(body.data.mimetype).to.match(/^image\\//);",
+                  "});",
+                  "",
+                  "if (body.data && body.data.id) {",
+                  "  pm.collectionVariables.set('uploadId', body.data.id);",
+                  "}",
+                  "",
+                  "if (body.data && body.data.filename) {",
+                  "  pm.collectionVariables.set('uploadFilename', body.data.filename);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a JPEG, PNG, WebP, or GIF image (max 2 MB)."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads"]
+            },
+            "description": "Upload one image. The field name must be `image`."
+          },
+          "response": []
+        },
+        {
+          "name": "List Uploads",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test('Returns a data array and pagination metadata', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  pm.expect(body.pagination).to.have.property('total');",
+                  "  pm.expect(body.pagination).to.have.property('page');",
+                  "  pm.expect(body.pagination).to.have.property('limit');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List uploads with pagination. Optionally add `mimetype=image/png`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Upload by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test('Returns the requested upload', function () {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.id).to.eql(pm.collectionVariables.get('uploadId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/{{uploadId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads", "{{uploadId}}"]
+            },
+            "description": "Uses the `uploadId` saved automatically by the Upload Image request."
+          },
+          "response": []
+        },
+        {
+          "name": "Serve Uploaded Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an image', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('image/');",
+                  "  pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/uploads/{{uploadFilename}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["uploads", "{{uploadFilename}}"]
+            },
+            "description": "Serves the actual uploaded image file."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Upload deleted successfully', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/{{uploadId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads", "{{uploadId}}"]
+            },
+            "description": "Deletes the MongoDB record and the file on disk. Run this last."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Negative Tests",
+      "item": [
+        {
+          "name": "Upload Without File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": []
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads"]
+            },
+            "description": "Sending no file should return 400."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload With Wrong Field Name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Explains the expected field name', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message.toLowerCase()).to.include('image');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Use the wrong field name `file` to trigger LIMIT_UNEXPECTED_FILE."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads"]
+            },
+            "description": "The field name must be `image`; using `file` should return 400."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Non-Image File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Rejects unsupported file type', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.message.toLowerCase()).to.match(/unsupported|does not match|does not look/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a .txt or .pdf file to verify it is rejected."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads"]
+            },
+            "description": "Only JPEG, PNG, WebP, and GIF images are allowed."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Upload With Invalid ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/not-a-valid-object-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads", "not-a-valid-object-id"]
+            },
+            "description": "Malformed ObjectIds should return 400, not crash the server."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Missing Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/000000000000000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads", "000000000000000000000000"]
+            },
+            "description": "A valid but non-existent ObjectId should return 404."
+          },
+          "response": []
+        },
+        {
+          "name": "Unknown Route",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/does-not-exist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "does-not-exist"]
+            },
+            "description": "Unknown routes should return the standard JSON 404 response."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "uploadId",
+      "value": ""
+    },
+    {
+      "key": "uploadFilename",
+      "value": ""
+    }
+  ]
+}
