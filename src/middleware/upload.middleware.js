@@ -7,14 +7,18 @@ const { hasValidImageSignature } = require('../utils/fileSignature');
 const {
   ALLOWED_IMAGE_TYPES,
   MAX_FILE_SIZE,
-  UPLOAD_DIR,
+  OPTIMIZED_DIR,
+  ORIGINALS_DIR,
+  THUMBNAILS_DIR,
 } = require('../config/upload');
 
-// Ensure the destination folder exists before Multer writes to it.
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// Ensure all storage folders exist before Multer or Sharp writes to them.
+for (const directory of [ORIGINALS_DIR, OPTIMIZED_DIR, THUMBNAILS_DIR]) {
+  fs.mkdirSync(directory, { recursive: true });
+}
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  destination: (req, file, cb) => cb(null, ORIGINALS_DIR),
   filename: (req, file, cb) => {
     const extension = path.extname(file.originalname).toLowerCase();
     // Random UUID + timestamp prevents filename collisions and makes

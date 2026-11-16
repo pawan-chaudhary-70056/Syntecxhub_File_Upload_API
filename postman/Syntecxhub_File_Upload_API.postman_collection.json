@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b6f4c2a1-3d5e-4f7a-9c8b-1a2b3c4d5e6f",
     "name": "Syntecxhub File Upload API",
-    "description": "Postman collection for the Syntecxhub Back-End Week 1 File/Image Upload API.\n\nEndpoints:\n- GET /api/health\n- POST /api/uploads\n- GET /api/uploads\n- GET /api/uploads/:id\n- GET /uploads/:filename\n- DELETE /api/uploads/:id\n\nBefore uploading, select a JPEG, PNG, WebP, or GIF file (max 2 MB) in the form-data body.",
+    "description": "Postman collection for the Syntecxhub Back-End Week 1 File/Image Upload API.\n\nEndpoints:\n- GET /api/health\n- POST /api/uploads\n- GET /api/uploads\n- GET /api/uploads/:id\n- GET /uploads/optimized/:filename\n- GET /uploads/thumbnails/:filename\n- DELETE /api/uploads/:id\n- GET /api-docs\n\nBefore uploading, select a JPEG, PNG, WebP, or GIF file (max 2 MB) in the form-data body. The field name must be `image`.\n\nImages are processed with Sharp into optimized WebP files and thumbnails.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -61,20 +61,31 @@
                   "",
                   "const body = pm.response.json();",
                   "",
-                  "pm.test('Returns upload metadata and URL', function () {",
+                  "pm.test('Returns upload metadata and processed URLs', function () {",
                   "  pm.expect(body.success).to.eql(true);",
                   "  pm.expect(body.data.id).to.be.a('string');",
                   "  pm.expect(body.data.filename).to.be.a('string');",
-                  "  pm.expect(body.data.url).to.include('/uploads/');",
+                  "  pm.expect(body.data.url).to.include('/uploads/optimized/');",
+                  "  pm.expect(body.data.thumbnailUrl).to.include('/uploads/thumbnails/');",
                   "  pm.expect(body.data.mimetype).to.match(/^image\\//);",
+                  "  pm.expect(body.data.width).to.be.a('number');",
+                  "  pm.expect(body.data.height).to.be.a('number');",
                   "});",
                   "",
                   "if (body.data && body.data.id) {",
                   "  pm.collectionVariables.set('uploadId', body.data.id);",
                   "}",
                   "",
+                  "if (body.data && body.data.url) {",
+                  "  pm.collectionVariables.set('optimizedFilename', body.data.url.split('/').pop());",
+                  "}",
+                  "",
+                  "if (body.data && body.data.thumbnailUrl) {",
+                  "  pm.collectionVariables.set('thumbnailFilename', body.data.thumbnailUrl.split('/').pop());",
+                  "}",
+                  "",
                   "if (body.data && body.data.filename) {",
-                  "  pm.collectionVariables.set('uploadFilename', body.data.filename);",
+                  "  pm.collectionVariables.set('originalFilename', body.data.filename);",
                   "}"
                 ]
               }
@@ -185,7 +196,7 @@
           "response": []
         },
         {
-          "name": "Serve Uploaded Image",
+          "name": "Serve Optimized Image",
           "event": [
             {
               "listen": "test",
@@ -196,8 +207,8 @@
                   "  pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test('Response is an image', function () {",
-                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('image/');",
+                  "pm.test('Response is an optimized WebP image', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('image/webp');",
                   "  pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff');",
                   "});"
                 ]
@@ -208,11 +219,43 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/uploads/{{uploadFilename}}",
+              "raw": "{{baseUrl}}/uploads/optimized/{{optimizedFilename}}",
               "host": ["{{baseUrl}}"],
-              "path": ["uploads", "{{uploadFilename}}"]
+              "path": ["uploads", "optimized", "{{optimizedFilename}}"]
             },
-            "description": "Serves the actual uploaded image file."
+            "description": "Serves the Sharp-optimized WebP image created during upload."
+          },
+          "response": []
+        },
+        {
+          "name": "Serve Thumbnail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is a WebP thumbnail', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('image/webp');",
+                  "  pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/uploads/thumbnails/{{thumbnailFilename}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["uploads", "thumbnails", "{{thumbnailFilename}}"]
+            },
+            "description": "Serves the generated 200x200 WebP thumbnail."
           },
           "response": []
         },
@@ -244,7 +287,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "uploads", "{{uploadId}}"]
             },
-            "description": "Deletes the MongoDB record and the file on disk. Run this last."
+            "description": "Deletes the MongoDB record, the original, the optimized image, and the thumbnail. Run this last."
           },
           "response": []
         }
@@ -425,6 +468,33 @@
           "response": []
         },
         {
+          "name": "Original File Is Not Public",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/uploads/originals/{{originalFilename}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["uploads", "originals", "{{originalFilename}}"]
+            },
+            "description": "Original uploads are stored privately and must not be served publicly."
+          },
+          "response": []
+        },
+        {
           "name": "Unknown Route",
           "event": [
             {
@@ -464,7 +534,15 @@
       "value": ""
     },
     {
-      "key": "uploadFilename",
+      "key": "optimizedFilename",
+      "value": ""
+    },
+    {
+      "key": "thumbnailFilename",
+      "value": ""
+    },
+    {
+      "key": "originalFilename",
       "value": ""
     }
   ]

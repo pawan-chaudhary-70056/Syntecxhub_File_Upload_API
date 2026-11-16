@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Upload = require('../models/Upload');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
+const { processImage, removeFiles } = require('../utils/imageProcessor');
 const { ALLOWED_MIME_TYPES, UPLOAD_DIR } = require('../config/upload');
 
 /**
@@ -16,18 +17,28 @@ function getBaseUrl(req) {
 }
 
 /**
- * Shapes a database record for API responses and adds an absolute URL.
- * The database stores a relative URL so the API can move between hosts.
+ * Shapes a database record for API responses and adds absolute URLs.
+ * The database stores relative URLs so the API can move between hosts.
+ * Internal filesystem paths are deliberately not exposed.
  */
 function toPublicUpload(upload, req) {
+  const baseUrl = getBaseUrl(req);
+
   return {
     id: upload._id,
     originalName: upload.originalName,
     filename: upload.filename,
-    url: `${getBaseUrl(req)}${upload.url}`,
+    url: `${baseUrl}${upload.url}`,
+    thumbnailUrl: `${baseUrl}${upload.thumbnailUrl}`,
     relativeUrl: upload.url,
+    relativeThumbnailUrl: upload.thumbnailUrl,
     mimetype: upload.mimetype,
+    format: upload.format,
+    width: upload.width,
+    height: upload.height,
     size: upload.size,
+    optimizedSize: upload.optimizedSize,
+    thumbnailSize: upload.thumbnailSize,
     createdAt: upload.createdAt,
     updatedAt: upload.updatedAt,
   };
@@ -44,31 +55,32 @@ function sanitizeOriginalName(name) {
 }
 
 /**
- * Deletes a file from disk, but only if it is inside UPLOAD_DIR.
+ * Deletes files from disk, but only if they are inside UPLOAD_DIR.
  * This prevents a tampered database record from deleting arbitrary files.
  */
-async function removeFileFromDisk(filePath) {
-  if (!filePath) return;
-
-  const resolvedPath = path.resolve(filePath);
+async function removeFilesFromDisk(filePaths) {
   const uploadRoot = `${UPLOAD_DIR}${path.sep}`;
 
-  if (!resolvedPath.startsWith(uploadRoot)) {
-    throw new ApiError(
-      500,
-      'Refusing to delete a file outside the upload directory.'
-    );
-  }
+  for (const filePath of filePaths.filter(Boolean)) {
+    const resolvedPath = path.resolve(filePath);
 
-  await fs.unlink(resolvedPath).catch((error) => {
-    if (error.code !== 'ENOENT') throw error;
-  });
+    if (!resolvedPath.startsWith(uploadRoot)) {
+      throw new ApiError(
+        500,
+        'Refusing to delete a file outside the upload directory.'
+      );
+    }
+
+    await fs.unlink(resolvedPath).catch((error) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+  }
 }
 
 /**
  * POST /api/uploads
- * Multer already stored the validated image on disk. This handler saves
- * the metadata in MongoDB, and cleans up the file if the DB write fails.
+ * Multer stores the validated original on disk. Sharp creates an optimized
+ * WebP image and a thumbnail, then the metadata is saved in MongoDB.
  */
 const createUpload = asyncHandler(async (req, res) => {
   if (!req.file) {
@@ -78,13 +90,31 @@ const createUpload = asyncHandler(async (req, res) => {
     );
   }
 
+  let processed;
+
+  try {
+    processed = await processImage(req.file.path, req.file.filename);
+  } catch (error) {
+    // Do not leave an unprocessed original behind.
+    await removeFiles([req.file.path]).catch(() => {});
+    throw error;
+  }
+
   const uploadData = {
     originalName: sanitizeOriginalName(req.file.originalname),
     filename: req.file.filename,
     path: req.file.path,
-    url: `/uploads/${req.file.filename}`,
+    optimizedPath: processed.optimizedPath,
+    thumbnailPath: processed.thumbnailPath,
+    url: processed.optimizedUrl,
+    thumbnailUrl: processed.thumbnailUrl,
     mimetype: req.file.mimetype,
+    format: processed.format,
+    width: processed.width,
+    height: processed.height,
     size: req.file.size,
+    optimizedSize: processed.optimizedSize,
+    thumbnailSize: processed.thumbnailSize,
   };
 
   try {
@@ -92,12 +122,16 @@ const createUpload = asyncHandler(async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Image uploaded successfully',
+      message: 'Image uploaded and processed successfully',
       data: toPublicUpload(upload, req),
     });
   } catch (error) {
-    // If metadata could not be saved, do not leave an orphan file behind.
-    await fs.unlink(req.file.path).catch(() => {});
+    // If metadata could not be saved, do not leave orphan files behind.
+    await removeFiles([
+      req.file.path,
+      processed.optimizedPath,
+      processed.thumbnailPath,
+    ]).catch(() => {});
     throw error;
   }
 });
@@ -176,7 +210,8 @@ const getUploadById = asyncHandler(async (req, res) => {
 
 /**
  * DELETE /api/uploads/:id
- * Removes both the MongoDB record and the file on disk.
+ * Removes the MongoDB record, the original, the optimized image, and
+ * the thumbnail from disk.
  */
 const deleteUpload = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -191,7 +226,11 @@ const deleteUpload = asyncHandler(async (req, res) => {
     throw new ApiError(404, `Upload with id ${id} not found`);
   }
 
-  await removeFileFromDisk(upload.path);
+  await removeFilesFromDisk([
+    upload.path,
+    upload.optimizedPath,
+    upload.thumbnailPath,
+  ]);
   await upload.deleteOne();
 
   res.status(200).json({

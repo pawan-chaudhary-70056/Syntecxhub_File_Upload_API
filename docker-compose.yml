@@ -1,0 +1,51 @@
+services:
+  api:
+    build: .
+    container_name: syntecxhub-upload-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/syntecxhub_upload
+      # Change this to your public domain when deploying.
+      BASE_URL: http://localhost:5000
+      CORS_ORIGIN: "*"
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: 2097152
+      IMAGE_MAX_WIDTH: 1920
+      IMAGE_MAX_HEIGHT: 1920
+      THUMBNAIL_SIZE: 200
+      WEBP_QUALITY: 82
+      MAX_IMAGE_PIXELS: 268402689
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+    container_name: syntecxhub-upload-mongo
+    restart: unless-stopped
+    # MongoDB is only reachable inside the Compose network.
+    # Use `docker compose exec mongo mongosh` for shell access.
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.runCommand({ ping: 1 }).ok",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  uploads:
+  mongo-data:

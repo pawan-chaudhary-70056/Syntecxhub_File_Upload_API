@@ -1,0 +1,13 @@
+node_modules
+.git
+.github
+.env
+.env.*
+!.env.example
+uploads
+postman
+tests
+coverage
+README.md
+setup.md
+*.log
