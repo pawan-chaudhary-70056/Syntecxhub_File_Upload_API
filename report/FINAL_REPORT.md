@@ -2613,8 +2613,6 @@ git push origin main
 | `.env` excluded | ✅ | Gitignored, not tracked |
 | Docker configuration included | ✅ | `Dockerfile` + `docker-compose.yml` |
 | CI workflow included | ✅ | `.github/workflows/ci.yml` |
-| LinkedIn post with @Syntecxhub | ⚠️ Not verifiable from repository | Manual intern action |
-| Official submission form | ⚠️ Not verifiable from repository | Manual intern action |
 | Final report | ✅ | `report/FINAL_REPORT.md` |
 
 ---
